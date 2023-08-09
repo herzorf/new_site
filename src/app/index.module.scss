@@ -1,0 +1,16 @@
+.app{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 50px;
+    :global{
+        .operate{
+            padding-bottom: 30px;
+            width: 600px;
+            display: flex;
+            align-items: space-between;
+        }
+    }
+}
+
