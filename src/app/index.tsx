@@ -1,11 +1,21 @@
 import styles from './index.module.scss'
 import Table, { ColumnsType } from 'antd/es/table';
-import { Button, Descriptions, Form, Input, Modal } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Button, Col, Descriptions, Form, Input, Modal, Row } from 'antd';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import http from '../http';
-import { textMap, useProductStore } from './state';
+import { checkExpression, textMap, useProductStore } from './state';
+import { Select, Space } from 'antd';
+import TextArea from 'antd/es/input/TextArea';
+import { DefaultOptionType } from 'antd/es/select';
 
+import { SelectProps } from 'antd/lib/select';
+
+const layout = {
+  labelCol: { span: 4 },
+  wrapperCol: { span: 16 },
+};
+type onChange = Required<SelectProps<string>>['onChange'];
 interface DataType {
   productId: Number;
   supplier: string;
@@ -19,6 +29,16 @@ interface MoreInfoType {
   value: string;
   key: string;
 }
+
+const kindArray = ['小轿车', '越野车（含suv）', '新能源汽车'];
+
+
+const limits = ["包含", "不包含", "等于", "不等于", "大于", "小于", "大于等于", "小于等于", "为空", "不为空", "开始为", "结束为"]
+
+type kindName = "小轿车" | "越野车（含suv）" | "新能源汽车"
+
+
+
 
 const App: React.FC = () => {
   const { Search } = Input;
@@ -84,8 +104,20 @@ const App: React.FC = () => {
       }
     },
   ];
+  const [kind, setKind] = useState<kindName>("小轿车")
   const [editId, setEditId] = useState<Number | null | string>(null)
   const [moreInfo, setMoreInfo] = useState<MoreInfoType[]>()
+  const [valueArray, setValueArray] = useState<Array<any>>([])
+  const [value, setValue] = useState<string>(valueArray[0])
+  const [open, setOpen] = useState(false);
+  const [searchToggle, setSearchToggle] = useState(false)
+  const [form] = Form.useForm();
+  const [moreInfoToggle, setMoreInfoToggle] = useState(false)
+  const [attributeArray, setAttributeArray] = useState<Array<any>>();
+  const [attribute, setAttribute] = useState<string>();
+  const [limitsValue, setLimitsValue] = useState<string>(limits[0]);
+  const [searchCondition, setSearchCondition] = useState<string>("");
+
   const productList = useProductStore(state => state.productList)
   const getProductList = useProductStore(state => state.getProductList)
   const deleteInfo = (productId: Number) => {
@@ -111,6 +143,7 @@ const App: React.FC = () => {
       setMoreInfo(temp)
     })
   }
+
   useEffect(() => {
     if (editId !== null) {
       http(`/system/product/${editId}`).then((res) => {
@@ -125,13 +158,43 @@ const App: React.FC = () => {
     getProductList()
   }, [])
 
-  const [open, setOpen] = useState(false);
-  const [form] = Form.useForm();
-  const [moreInfoToggle, setMoreInfoToggle] = useState(false)
-  const layout = {
-    labelCol: { span: 4 },
-    wrapperCol: { span: 16 },
+
+  const handleKindChange = (value: string) => {
+    http("/system/attribute/list", { params: { kind: value } }).then(res => {
+      setAttributeArray(res.data.rows)
+    })
   };
+  useEffect(() => {
+    handleKindChange(kind)
+  }, [])
+  useEffect(() => {
+    setAttribute(attributeArray?.[0].attributeName)
+    onAttributeChange(attributeArray?.[0].attributeName, { value: attributeArray?.[0].attributeId })
+  }, [attributeArray])
+
+  const onAttributeChange = (value: string, options: any) => {
+    http("/system/value/list", { params: { attributeId: options.value } }).then(res => {
+      if (res.data.code === 200) {
+        console.log(res.data.rows[0])
+        setValue(res.data.rows[0]?.attributeValue)
+        setValueArray(res.data.rows)
+      }
+    })
+  };
+
+  const addSearchCondition = (value: string, flag: boolean) => {
+    // true 代表只添加逻辑运算符
+    if (flag) {
+      setSearchCondition(searchCondition + value + "\n")
+    } else {
+      setSearchCondition(searchCondition + attribute + " " + limitsValue + " " + value + "\n");
+    }
+    console.log(searchCondition)
+  }
+
+  useEffect(() => {
+    console.log(checkExpression(searchCondition))
+  }, [searchCondition])
 
   const onFinish = (values: any) => {
     // 判断表单的校验是否通过
@@ -169,6 +232,12 @@ const App: React.FC = () => {
         &nbsp;&nbsp;
         &nbsp;&nbsp;
         <Search placeholder="输入商品名称进行查询" size='large' onSearch={onSearch} enterButton />
+        <Button
+          style={{ marginLeft: "200px" }}
+          icon={<SearchOutlined />}
+          size='large'
+          onClick={() => setSearchToggle(true)}
+        >搜索</Button>
       </div>
 
       <Table columns={columns} dataSource={productList} bordered size='small' scroll={{ x: 1500, y: 600 }} />
@@ -251,9 +320,87 @@ const App: React.FC = () => {
         </Descriptions>
 
       </Modal>
+      <Modal
+        title="搜索条件"
+        centered
+        open={searchToggle}
+        onOk={() => setSearchToggle(false)}
+        onCancel={() => setSearchToggle(false)}
+        width={1000}
+        okText="搜索"
+        footer={[
+          <Button danger key="reset" onClick={() => setSearchCondition("")}>
+            清空
+          </Button>,
+          <Button key="submit" type="primary" onClick={() => setOpen(false)}>
+            搜索
+          </Button>,
+        ]}
+      >
+        <br />
+        <Row>
+          <Col span={8}>
+            <Select
+              defaultValue={kind[0] as kindName}
+              style={{ width: 300 }}
+              value={kind}
+              onChange={handleKindChange}
+              options={kindArray.map((item) => ({ label: item, value: item }))}
+            />
+          </Col>
+          <Col span={8}>
+            <Select
+              style={{ width: 300 }}
+              value={attribute as kindName}
+              onChange={onAttributeChange}
+              options={attributeArray?.map((item) => ({ label: item.attributeName, value: item.attributeId }))}
+            />
+          </Col>
+
+          <Col span={8}>
+            <Select
+              style={{ width: 300 }}
+              value={limitsValue}
+              onChange={(value) => { setLimitsValue(value) }}
+              options={limits?.map((city) => ({ label: city, value: city }))}
+            />
+          </Col>
+        </Row>
+        <br />
+        <Row>
+          <Col span={20}>
+            <Select
+              style={{ width: "100%" }}
+              value={value}
+              onChange={(value) => { setValue(value) }}
+              options={valueArray?.map((value) => ({ label: value.attributeValue, value: value.attributeValue }))}
+            />
+          </Col>
+          <Col span={2} offset={1}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => addSearchCondition(value, false)} >添加</Button>
+          </Col>
+        </Row>
+        <br />
+        <Space>
+          <Button onClick={() => addSearchCondition("并且", true)}>并且</Button>
+          <Button onClick={() => addSearchCondition("或者", true)}>或者</Button>
+          <Button onClick={() => addSearchCondition("非", true)}>非</Button>
+          <Button onClick={() => addSearchCondition("(", true)}>(</Button>
+          <Button onClick={() => addSearchCondition(")", true)}>)</Button>
+        </Space>
+        <br />
+        <br />
+
+        <TextArea
+          maxLength={1000}
+          readOnly
+          value={searchCondition}
+          style={{ height: 120, resize: 'none' }}
+        />
+      </Modal>
     </div >
   )
 
 }
 
-export default App
+export default App;
