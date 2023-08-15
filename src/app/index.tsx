@@ -175,7 +175,6 @@ const App: React.FC = () => {
   const onAttributeChange = (value: string, options: any) => {
     http("/system/value/list", { params: { attributeId: options.value } }).then(res => {
       if (res.data.code === 200) {
-        console.log(res.data.rows[0])
         setValue(res.data.rows[0]?.attributeValue)
         setValueArray(res.data.rows)
       }
@@ -189,12 +188,12 @@ const App: React.FC = () => {
     } else {
       setSearchCondition(searchCondition + attribute + " " + limitsValue + " " + value + "\n");
     }
-    console.log(searchCondition)
   }
 
-  useEffect(() => {
+  const search = () => {
+    setSearchToggle(false)
     console.log(checkExpression(searchCondition))
-  }, [searchCondition])
+  }
 
   const onFinish = (values: any) => {
     // 判断表单的校验是否通过
@@ -332,7 +331,7 @@ const App: React.FC = () => {
           <Button danger key="reset" onClick={() => setSearchCondition("")}>
             清空
           </Button>,
-          <Button key="submit" type="primary" onClick={() => setOpen(false)}>
+          <Button key="submit" type="primary" onClick={search}>
             搜索
           </Button>,
         ]}
